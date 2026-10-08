@@ -83,19 +83,76 @@ class FlutterNfcKitPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             val handledFn = Runnable {
                 try {
                     fn()
+                // } catch (ex: Exception) {
+                //     Log.e(TAG, "$desc error", ex)
+                //     val excMessage = ex.localizedMessage
+                //     when (ex) {
+                //         is IOException -> result.error("500", "Communication error", excMessage)
+                //         is SecurityException -> result.error("503", "Tag already removed", excMessage)
+                //         is FormatException -> result.error("400", "NDEF format error", excMessage)
+                //         is InvocationTargetException -> result.error("500", "Communication error", excMessage)
+                //         is IllegalArgumentException -> result.error("400", "Command format error", excMessage)
+                //         is NoSuchMethodException -> result.error("405", "Transceive not supported for this type of card", excMessage)
+                //         else -> result.error("500", "Unhandled error", excMessage)
+                //     }
+                // }
+                
                 } catch (ex: Exception) {
-                    Log.e(TAG, "$desc error", ex)
-                    val excMessage = ex.localizedMessage
-                    when (ex) {
-                        is IOException -> result.error("500", "Communication error", excMessage)
-                        is SecurityException -> result.error("503", "Tag already removed", excMessage)
-                        is FormatException -> result.error("400", "NDEF format error", excMessage)
-                        is InvocationTargetException -> result.error("500", "Communication error", excMessage)
-                        is IllegalArgumentException -> result.error("400", "Command format error", excMessage)
-                        is NoSuchMethodException -> result.error("405", "Transceive not supported for this type of card", excMessage)
-                        else -> result.error("500", "Unhandled error", excMessage)
+                    val rootCause: Throwable =
+                        if (ex is InvocationTargetException) {
+                            ex.targetException ?: ex
+                        } else {
+                            ex
+                        }
+                    Log.e(
+                        TAG,
+                        "$desc error: ${rootCause.javaClass.simpleName}",
+                        rootCause
+                    )
+                
+                    when (rootCause) {
+                        is android.nfc.TagLostException -> {
+                            result.error(
+                                "TAG_LOST",
+                                "Koneksi NFC ke kartu terputus",
+                                null
+                            )
+                        }
+                
+                        is IOException -> {
+                            result.error(
+                                "500",
+                                "NFC communication error",
+                                rootCause.localizedMessage
+                            )
+                        }
+                
+                        is SecurityException -> {
+                            result.error(
+                                "503",
+                                "NFC tag sudah tidak valid",
+                                null
+                            )
+                        }
+                
+                        is FormatException -> {
+                            result.error(
+                                "400",
+                                "NDEF format error",
+                                rootCause.localizedMessage
+                            )
+                        }
+                
+                        else -> {
+                            result.error(
+                                "500",
+                                "Unhandled NFC error",
+                                rootCause.localizedMessage
+                            )
+                        }
                     }
                 }
+
             }
             ensureNfcHandler()
             if (!nfcHandler.post(handledFn)) {
